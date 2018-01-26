@@ -160,7 +160,25 @@ redis-cli -h ip -p port bgrewriteaof
 
 **AOF rewrite过程并不阻塞客户端请求。系统会开启一个子进程来完成。**
 
+# 三、如何禁用持久化
 
+** 修改配置文件，注释掉所有save 有关的配置，并保持appendonly为no；删除dbfilename配置项配置的dump.rdb文件然后重启 ** 
+修改后的相关配置如下
+```
+#save 900 1  
+#save 300 10  
+#save 60 10000 
+appendonly no 
+```
+或者
+
+```
+#save 900 1  
+#save 300 10  
+#save 60 10000
+save ""
+appendonly no 
+```
 # 四、建议
 
 * (1). 可以通过配置文件来指定它们中的一种，或者同时使用它们(不建议同时使用)，或者全部禁用。
