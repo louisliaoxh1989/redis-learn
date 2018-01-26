@@ -13,69 +13,112 @@ ZCARD "online_users"
 
 首先， 通过 ZINTERSTORE 和 ZUNIONSTORE 命令， 我们可以对多个记录了在线用户的有序集合进行聚合计算：
 
-# 计算出 7 天之内都有上线的用户，并将它储存到 7_days_both_online_users 有序集合当中
+* (1) 计算出 7 天之内都有上线的用户，并将它储存到 7_days_both_online_users 有序集合当中
+```
 ZINTERSTORE 7_days_both_online_users 7 "day_1_online_users" "day_2_online_users" ... "day_7_online_users"
-
-# 计算出 7 天之内总共有多少人上线了
+```
+* (2) 计算出 7 天之内总共有多少人上线了
+```
 ZUNIONSTORE 7_days_total_online_users 7 "day_1_online_users" ... "day_7_online_users"
-此外， 通过 ZCOUNT 命令， 我们可以统计出在指定的时间段之内有多少用户在线， 而 ZRANGEBYSCORE 命令则可以让我们获取到这些用户的名单：
+```
+    此外， 通过 ZCOUNT 命令， 我们可以统计出在指定的时间段之内有多少用户在线， 而 ZRANGEBYSCORE 命令则可以让我们获取到这些用户的名单：
 
-# 统计指定时间段内上线的用户数量
+* (3) 统计指定时间段内上线的用户数量
+```
 ZCOUNT "online_users" <start_timestamp> <end_timestamp>
+```
+* (4) 获取指定时间段内上线的用户名单
 
-# 获取指定时间段内上线的用户名单
+```
 ZRANGEBYSCORE "online_users" <start_timestamp> <end_timestamp> WITHSCORES
+```
+
 通过这一方法， 我们可以知道网站在不同时间段的上线人数以及上线用户名单， 比如说， 我们可以用这个方法来分别获知网站在早晨、上午、中午、下午和夜晚的上线人数。
 
-方案 2 ：使用集合
+## 方案 2 ：使用集合
+
 正如上一节所说， 使用有序集合能够同时储存在线用户的名单以及各个用户的上线时间， 但如果我们只想要记录在线用户的名单， 而不想要储存用户的上线时间， 那么也可以使用集合来代替有序集合， 对在线的用户进行记录。
 
 在这种情况下， 每当一个用户上线时， 我们就执行以下 SADD 命令， 将它添加到在线用户名单当中：
 
+```
 SADD "online_users" <user_id>
+```
+
 通过使用 SISMEMBER 命令， 我们可以检查一个指定的用户当前是否在线：
 
+```
 SISMEMBER "online_users" <user_id>
+```
+
 而统计在线人数的工作则可以通过执行 SCARD 命令来完成：
-
+```
 SCARD "online_users"
-通过集合运算操作， 我们可以像有序集合方案一样， 对不同时间段或者日期的在线用户名单进行聚合计算。 比如说， 通过 SINTER 或者 SINTERSTORE 命令， 我们可以计算出一周都有在线的用户：
+```
 
+通过集合运算操作， 我们可以像有序集合方案一样， 对不同时间段或者日期的在线用户名单进行聚合计算。 
+
+比如说通过 ** SINTER 或者 SINTERSTORE ** 命令， 我们可以计算出一周都有在线的用户：
+
+```
 SINTER "day_1_online_users" "day_2_online_users" ... "day_7_online_users"
+```
+
 此外， 通过 SUNION 命令或者 SUNIONSTORE 命令， 我们可以计算出一周内在线用户的总数量：
 
+```
 SUNION "day_1_online_users" "day_2_online_users" ... "day_7_online_users"
+```
+
 而通过执行 SDIFF 命令或者 SDIFFSTORE 命令， 我们可以知道哪些用户今天上线了， 但是昨天没有上线：
 
+```
 SDIFF "today_online_users" "yesterday_online_users"
+```
 又或者工作日上线了， 但是假日没有上线：
 
-# 计算工作日上线名单
+计算工作日上线名单
+```
 SINTERSTORE "weekday_online_users" "monday_online_users" "tuesday_online_users" ... "friday_online_users"
-# 计算假日上线名单
+```
+计算假日上线名单
+```
 SINTERSTORE "holiday_online_users" "saturday_online_users" "sunday_online_users"
-# 计算工作日上线但是假日未上线的名单
+```
+计算工作日上线但是假日未上线的名单
+```
 SDIFF "weekday_online_users" "holiday_online_users"
 诸如此类。
+```
+## 方案 3 ：使用 HyperLogLog
 
-方案 3 ：使用 HyperLogLog
 虽然使用有序集合和集合能够很好地完成记录在线人数的工作， 但以上这两个方案都有一个明显的缺点， 那就是， 这两个方案耗费的内存会随着被统计用户数量的增多而增多： 如果你的网站用户数量比较多， 又或者你需要记录多天/多个时段的在线用户名单并进行聚合计算， 那么这两个方案可能会消耗你大量内存。
 
 另一方面， 在有些情况下， 我们只想要知道在线用户的人数， 而不需要知道具体的在线用户名单， 这时有序集合和集合储存的信息就会显得多余了。
 
 在需要尽可能地节约内存并且只需要知道在线用户数量的情况下， 我们可以使用 HyperLogLog 来对在线用户进行统计： HyperLogLog 是一个概率算法， 它可以对元素的基数进行估算， 并且每个 HyperLogLog 只需要耗费 12 KB 内存， 对于用户数量非常多但是内存却非常紧张的系统， 这一方案无疑是最佳之选。
 
-在这一方案下， 我们使用 PFADD 命令去记录在线的用户：
+在这一方案下
 
+我们使用**PFADD**命令去记录在线的用户：
+
+```
 PFADD "online_users" <user_id>
-使用 PFCOUNT 命令获取在线人数：
+```
 
+**使用 PFCOUNT 命令获取在线人数：**
+
+```
 PFCOUNT "online_users"
+```
+
 因为 HyperLogLog 也提供了计算交集的 PFMERGE 命令， 所以我们也可以用这个命令计算出多个给定时间段或日期之内， 上线的总人数：
 
-# 统计 7 天之内总共有多少人上线了
+***统计 7 天之内总共有多少人上线了***
+```
 PFMERGE "7_days_both_online_users" "day_1_online_users" "day_2_online_users" ... "day_7_online_users"
 PFCOUNT "7_days_both_online_users"
+```
 方案 4 ：使用位图（bitmap）
 回顾上面介绍的三个方案， 我们可以得出以上结论：
 
