@@ -1,8 +1,9 @@
 [TOC]
 
-[Reids的数据的两种存储模式](一、Reids的数据的两种存储模式)
+[Reids的数据的两种存储模式](#一Reids的数据的两种存储模式)
 
-# 一、Reids的数据的两种存储模式
+一Reids的数据的两种存储模式
+------
 
 **Redis中数据存储模式有2种：cache-only,persistence**
 
