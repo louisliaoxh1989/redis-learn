@@ -159,3 +159,14 @@ redis-cli -h ip -p port bgrewriteaof
 因为rewrite操作/aof记录同步/snapshot都消耗磁盘IO，redis采取了“schedule”策略：无论是“人工干预”还是系统触发，snapshot和rewrite需要逐个被执行。
 
 **AOF rewrite过程并不阻塞客户端请求。系统会开启一个子进程来完成。**
+
+
+# 建议
+
+可以通过配置文件来指定它们中的一种，或者同时使用它们(不建议同时使用)，或者全部禁用。
+
+在架构良好的环境中，master通常使用AOF，slave使用snapshot，主要原因是master需要首先确保数据完整性，它作为数据备份的第一选择；slave提供只读服务(目前slave只能提供读取服务)，它的主要目的就是快速响应客户端read请求
+
+但是如果你的redis运行在网络稳定性差/物理环境糟糕情况下，建议你master和slave均采取AOF，这个在master和slave角色切换时，可以减少“人工数据备份”/“人工引导数据恢复”的时间成本
+
+如果你的环境一切非常良好，且服务需要接收密集性的write操作，那么建议master采取snapshot，而slave采用AOF。
